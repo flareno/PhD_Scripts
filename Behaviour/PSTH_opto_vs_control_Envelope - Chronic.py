@@ -17,25 +17,6 @@ import glob
 import os
 import numpy as np
 
-import quantities as pq
-from quantities import Hz, s, ms
-import pandas as pd
-from matplotlib import cm
-from matplotlib.ticker import LinearLocator, FormatStrFormatter
-import scipy.stats
-import scipy.signal
-import neo
-from neo.core import SpikeTrain
-import elephant.spike_train_generation as Spike
-import elephant.statistics as stat
-import elephant.conversion as conv
-import elephant.kernels as kernels
-import warnings
-from mpl_toolkits.mplot3d import Axes3D
-import bisect as bi
-from scipy.ndimage.filters import gaussian_filter1d
-
-
 protocol = 'P18'
 mouse = '6409'
 nb_control_trials = 30
