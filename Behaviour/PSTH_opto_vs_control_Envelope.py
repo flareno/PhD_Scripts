@@ -42,21 +42,10 @@ Concat_licks_stim = [0]
 
 for giri,file in enumerate(names, start=1):    
     path = f"D:/F.LARENO.FACCINI/Preliminary Results/Behaviour/Group 14/{mouse}/Fixed Delay/{protocol}/{file}.lick"
+    
     lick = bv.load_lickfile(path)
-  
-    # ===========================================================================
-    # ======================   SEPARATE OPTO AND CONTROL   ======================
-    # ===========================================================================
-    nostim = []
-    stim = []
-    
-    [nostim.append([t,l]) for t,l in lick if t <= nb_control_trials]
-    nostim = np.asarray(nostim)
-    [stim.append([t,l]) for t,l in lick if t > nb_control_trials]
-    stim = np.asarray(stim)
- 
-    # print(len(nostim), len(stim))
-    
+    nostim, stim = bv.separate_by_condition(lick)    
+
     # ===========================================================================
     # ==========================   CONCATENATE   ================================ 
     # ===========================================================================
