@@ -16,6 +16,8 @@ import extrapy.Behaviour as bv
 import glob
 import os
 import numpy as np
+from scipy.ndimage.filters import gaussian_filter1d
+
 
 protocol = 'P18'
 mouse = '6409'
