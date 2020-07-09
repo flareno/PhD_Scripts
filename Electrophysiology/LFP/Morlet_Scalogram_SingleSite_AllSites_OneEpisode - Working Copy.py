@@ -2,7 +2,7 @@
 """
 Created on Thu Apr 18 14:11:22 2019
 
-@author: F.LARENO-FACCINI
+@author: Federica Lareno Faccini (original functions from Sam Garcia)
 """
 
 #from compute_timefreq import compute_timefreq
