@@ -18,7 +18,7 @@ from openpyxl import load_workbook
 
 
 mouse = 1094
-session = 3
+session = 6
 
 path = r"D:/F.LARENO.FACCINI/Preliminary Results/Scripts/New Pipeline/1094_2019_12_12_15_09_05/1094_2019_12_12_11_02_20.lick"
 param = r"D:/F.LARENO.FACCINI/Preliminary Results/Scripts/New Pipeline/1094_2019_12_12_15_09_05/1094_2019_12_12_11_02_20.param"
@@ -54,9 +54,10 @@ for i in range(N_TRIALS):
 # ========================================================================================
 # Extracting the envelope of the PSTH (the n of the PSTH)
 # ========================================================================================
-n,bins,patches = bv.psth_lick(licks)
-col =[f'Session {session}']
-env_df = pd.DataFrame(n, index=None, columns=col)
+n,bins,patches = bv.psth_lick(licks,samp_period=0.01)
+env_df = pd.DataFrame(n, index=None, columns=[f'Session {session}'])
+bins_df = pd.DataFrame(bins, index=None, columns=[f'Session {session}'])
+
 
 # ========================================================================================
 # Create the dataframe
@@ -75,11 +76,15 @@ if os.path.isfile(f'{savedir}\{mouse}.xlsx'):
     book = load_workbook(f'{savedir}\{mouse}.xlsx')
     exc = pd.read_excel(f'{savedir}\{mouse}.xlsx', sheet_name='Envelope')
     exc[f'Session {session}'] = n
+    exc_bin = pd.read_excel(f'{savedir}\{mouse}.xlsx', sheet_name='Bins of Envelope')
+    exc_bin[f'Session {session}'] = bins
+
     
     with pd.ExcelWriter(f'{savedir}\{mouse}.xlsx', engine="openpyxl") as writer:
         writer.book = book
         writer.sheets = dict((ws.title, ws) for ws in book.worksheets)
         exc.to_excel(writer, index=False, sheet_name='Envelope')
+        exc_bin.to_excel(writer, index=False, sheet_name = 'Bins of Envelope')
         df.to_excel(writer, index=False, sheet_name=f"Session {session}")
 
         
@@ -87,5 +92,6 @@ if os.path.isfile(f'{savedir}\{mouse}.xlsx'):
 # creates new excel file if it doesn't exist for that mouse
 else:
     with pd.ExcelWriter(f'{savedir}\{mouse}.xlsx', engine="openpyxl") as writer:    
-        env_df.to_excel(writer,index=False, columns = col, sheet_name='Envelope')
+        env_df.to_excel(writer,index=False, sheet_name='Envelope')
+        bins_df.to_excel(writer, index=False, sheet_name = 'Bins of Envelope')
         df.to_excel(writer, index=False, sheet_name=f"Session {session}")
