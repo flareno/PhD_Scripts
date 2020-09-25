@@ -4,6 +4,11 @@
 Created on Sat Dec 14 09:27:25 2019
 
 @author: Federica LARENO FACCINI
+
+Create excel file as DATABASE of BEHAVIOURAL DATA.
+One file for each animal.
+The first time it runs for one animal it creates the file (first session). After that, everytime it runs, it adds a new sheet for the new behaviour session.
+The ENVELOPE (n by bin of the PSTH by session)is saved in a specific sheet, one column for each session.
 """
 import extrapy.Behaviour as bv
 import pandas as pd
