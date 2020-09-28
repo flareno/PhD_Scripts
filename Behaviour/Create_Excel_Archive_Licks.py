@@ -53,24 +53,22 @@ for i in range(N_TRIALS):
         licks_by_trial.append(np.nan)
 
 licks_by_trial = [np.asarray(x) for x in licks_by_trial]
-# prova = {'l0':licks_by_trial[0]}
 
 
-
+#Get the length of the longest sequence of licks (the trial with more licks)
 for idx,i in enumerate(licks_by_trial):
     if idx==0:
         tem__ = i.size
     else:
         tem__ = np.vstack((tem__,i.size))
-
 max_lick = np.max(tem__)
 
+#convert from list of arrays to 2D array
 all_licks = np.zeros((len(licks_by_trial),max_lick))
 all_licks[:] = np.nan
 
-
 for idx,x in enumerate(licks_by_trial):
-    l = x.size
+    l = x.size 
     all_licks[idx,:l] = x
 
 
@@ -88,11 +86,9 @@ bins_df = pd.DataFrame(bins, index=None, columns=[f'Session {session}'])
 cols = ['Trial Number', 'Delay (ms)', 'Number of Licks']#, 'Licks']
 df = pd.DataFrame(zip(trial, delay, num_licks),columns=cols)
 
-
+# Add the lick times to the df column-wise (so that in the .xlsx each lick time will be stored in its individual cell)
 for idx,i in enumerate(all_licks.T):
-    print(idx,i.size)
-    df[f'Lick {idx}'] = i[:len(df)]
-
+    df[f'Lick {idx}'] = i[:len(df)] #due to a bug in the logging of trial's parameters in the acquisition software, we have always to delete the last trial of the behaviour. Hence I'm not including the last trial in the df as it's virtually inexistent.
 
 # ========================================================================================
 # Create Excel File
@@ -123,5 +119,3 @@ else:
         env_df.to_excel(writer,index=False, sheet_name='Envelope')
         bins_df.to_excel(writer, index=False, sheet_name = 'Bins of Envelope')
         df.to_excel(writer, index=False, sheet_name=f"Session {session}")
-
-
