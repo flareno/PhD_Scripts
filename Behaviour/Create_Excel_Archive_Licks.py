@@ -18,10 +18,10 @@ from openpyxl import load_workbook
 
 
 mouse = 1094
-session = 6
+session = 7
 
-path = r"D:/F.LARENO.FACCINI/Preliminary Results/Scripts/New Pipeline/1094_2019_12_12_15_09_05/1094_2019_12_12_11_02_20.lick"
-param = r"D:/F.LARENO.FACCINI/Preliminary Results/Scripts/New Pipeline/1094_2019_12_12_15_09_05/1094_2019_12_12_11_02_20.param"
+path = r"D:/F.LARENO.FACCINI/Preliminary Results/Scripts/New Pipeline/1094_2019_12_12_15_09_05/1094_2019_12_12_15_09_05.lick"
+param = r"D:/F.LARENO.FACCINI/Preliminary Results/Scripts/New Pipeline/1094_2019_12_12_15_09_05/1094_2019_12_12_15_09_05.param"
 
 # ========================================================================================
 # Load lick files and random delays
@@ -46,10 +46,33 @@ N_TRIALS = int(max(licks[:,0]))
 for i in range(N_TRIALS):
     temp__ = [licks[:,1][j] for j in range(len(licks)) if licks[:,0][j]==i+1]
     num_licks.append(len(temp__))
+
     if len(temp__) > 0:
         licks_by_trial.append(temp__)
     else:
         licks_by_trial.append(np.nan)
+
+licks_by_trial = [np.asarray(x) for x in licks_by_trial]
+# prova = {'l0':licks_by_trial[0]}
+
+
+
+for idx,i in enumerate(licks_by_trial):
+    if idx==0:
+        tem__ = i.size
+    else:
+        tem__ = np.vstack((tem__,i.size))
+
+max_lick = np.max(tem__)
+
+all_licks = np.zeros((len(licks_by_trial),max_lick))
+all_licks[:] = np.nan
+
+
+for idx,x in enumerate(licks_by_trial):
+    l = x.size
+    all_licks[idx,:l] = x
+
 
 # ========================================================================================
 # Extracting the envelope of the PSTH (the n of the PSTH)
@@ -62,8 +85,13 @@ bins_df = pd.DataFrame(bins, index=None, columns=[f'Session {session}'])
 # ========================================================================================
 # Create the dataframe
 # ========================================================================================
-cols = ['Trial Number', 'Delay (ms)', 'Number of Licks', 'Licks']
-df = pd.DataFrame(zip(trial, delay, num_licks, licks_by_trial),columns=cols)
+cols = ['Trial Number', 'Delay (ms)', 'Number of Licks']#, 'Licks']
+df = pd.DataFrame(zip(trial, delay, num_licks),columns=cols)
+
+
+for idx,i in enumerate(all_licks.T):
+    print(idx,i.size)
+    df[f'Lick {idx}'] = i[:len(df)]
 
 
 # ========================================================================================
@@ -95,3 +123,5 @@ else:
         env_df.to_excel(writer,index=False, sheet_name='Envelope')
         bins_df.to_excel(writer, index=False, sheet_name = 'Bins of Envelope')
         df.to_excel(writer, index=False, sheet_name=f"Session {session}")
+
+
