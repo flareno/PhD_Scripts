@@ -9,6 +9,7 @@ Create excel file as DATABASE of BEHAVIOURAL DATA.
 One file for each animal.
 The first time it runs for one animal it creates the file (first session). After that, everytime it runs, it adds a new sheet for the new behaviour session.
 The ENVELOPE (n by bin of the PSTH by session)is saved in a specific sheet, one column for each session.
+The data stored for each session is: trial number, delay of the reward, opening time of the valve (the water appears at the end of the OT), number of licks per trial and each individual lick time.
 """
 import extrapy.Behaviour as bv
 import pandas as pd
@@ -19,7 +20,7 @@ import glob
 
 
 mouse = 173
-session = 'T9-1'
+session = 'T8-1'
 
 og_path = fr"D:\F.LARENO.FACCINI\Preliminary Results\Behaviour\Group 15\{mouse}\Training\{session}\*.lick"
 files = glob.glob(og_path)
@@ -44,10 +45,13 @@ if len(files)>1:
         random = bv.extract_random_delay(param)
         # Format the delay array
         delay = np.asarray([d for d, _ in (random)])
+        ot = np.asarray(bv.extract_ot(param))
         if idx ==0:
             delays = delay
+            ots = ot
         else:
             delays = np.concatenate((delays,delay))
+            ots = np.concatenate((ots,ot))
         # Format the trial array
         trial = np.asarray([d for _,d in (random)])
         trial[:] = [i+trials[-1] for i in trial]
@@ -66,6 +70,8 @@ else:
     # Format the lists
     delays = np.asarray([d for d, _ in (random)])
     trials = np.asarray([d for _,d in (random)])
+    ots = bv.extract_ot(param)
+
 
 # ========================================================================================
 # Divide licks by trial and get number of licks per trial
@@ -115,8 +121,8 @@ bins_df = pd.DataFrame(bins, index=None, columns=[f'Session {session}'])
 # ========================================================================================
 # Create the dataframe
 # ========================================================================================
-cols = ['Trial Number', 'Delay (ms)', 'Number of Licks']#, 'Licks']
-df = pd.DataFrame(zip(trials, delays, num_licks),columns=cols)
+cols = ['Trial Number', 'Delay (ms)', 'Opening Time (ms)', 'Number of Licks']#, 'Licks']
+df = pd.DataFrame(zip(trials, delays, ots, num_licks),columns=cols)
 
 # Add the lick times to the df column-wise (so that in the .xlsx each lick time will be stored in its individual cell)
 for idx,i in enumerate(all_licks.T):
