@@ -15,25 +15,57 @@ import pandas as pd
 import numpy as np
 import os
 from openpyxl import load_workbook
+import glob
 
 
-mouse = 1094
-session = 7
+mouse = 173
+session = 'T9-1'
 
-path = r"D:/F.LARENO.FACCINI/Preliminary Results/Scripts/New Pipeline/1094_2019_12_12_15_09_05/1094_2019_12_12_15_09_05.lick"
-param = r"D:/F.LARENO.FACCINI/Preliminary Results/Scripts/New Pipeline/1094_2019_12_12_15_09_05/1094_2019_12_12_15_09_05.param"
+og_path = fr"D:\F.LARENO.FACCINI\Preliminary Results\Behaviour\Group 15\{mouse}\Training\{session}\*.lick"
+files = glob.glob(og_path)
+#extract file name
+files = [os.path.basename(i) for i in files]
 
-# ========================================================================================
-# Load lick files and random delays
-# ========================================================================================
-licks = bv.load_lickfile(path)
-random = bv.extract_random_delay(param)
+basepath = fr"D:/F.LARENO.FACCINI/Preliminary Results/Behaviour/Group 15/{mouse}/Training/{session}"
+savedir = r"D:\F.LARENO.FACCINI\Preliminary Results\Behaviour\Database\Group 15"
 
-# ========================================================================================
-# Format the lists
-# ========================================================================================
-delay = np.asarray([d for d, _ in (random)])
-trial = np.asarray([d for _,d in (random)])
+# During training mistakes in the recordings can happen.
+# These mistakes can lead to shorter recordings and thus to the creation of multiple files for the same session.
+# With the following loop I check if there are multiple files in the same session.
+# If so, I concatenate them so that the trial number becomes sequetial and I concatenate also the delays
+if len(files)>1:
+    licks = bv.concatenate_licks(basepath,skip_last=True)
+    files = [f.replace(".lick","") for f in files]
+    trials = [0] # Initialize counter for trial number
+    for idx,file in enumerate(files):
+        #recreate path
+        param = basepath+'/'+file+".param"
+        #Load random delays
+        random = bv.extract_random_delay(param)
+        # Format the delay array
+        delay = np.asarray([d for d, _ in (random)])
+        if idx ==0:
+            delays = delay
+        else:
+            delays = np.concatenate((delays,delay))
+        # Format the trial array
+        trial = np.asarray([d for _,d in (random)])
+        trial[:] = [i+trials[-1] for i in trial]
+        trials = np.append(trials,trial)
+    trials = np.delete(trials,0)
+
+# In case there is only one file per session
+else:
+    file = files[0].replace(".lick","")
+    #recreate paths
+    path = basepath+'/'+file+".lick"
+    param = basepath+'/'+file+".param"
+    # Load lick files and random delays
+    licks = bv.load_lickfile(path)
+    random = bv.extract_random_delay(param)
+    # Format the lists
+    delays = np.asarray([d for d, _ in (random)])
+    trials = np.asarray([d for _,d in (random)])
 
 # ========================================================================================
 # Divide licks by trial and get number of licks per trial
@@ -84,7 +116,7 @@ bins_df = pd.DataFrame(bins, index=None, columns=[f'Session {session}'])
 # Create the dataframe
 # ========================================================================================
 cols = ['Trial Number', 'Delay (ms)', 'Number of Licks']#, 'Licks']
-df = pd.DataFrame(zip(trial, delay, num_licks),columns=cols)
+df = pd.DataFrame(zip(trials, delays, num_licks),columns=cols)
 
 # Add the lick times to the df column-wise (so that in the .xlsx each lick time will be stored in its individual cell)
 for idx,i in enumerate(all_licks.T):
@@ -93,7 +125,6 @@ for idx,i in enumerate(all_licks.T):
 # ========================================================================================
 # Create Excel File
 # ========================================================================================
-savedir = r"D:\F.LARENO.FACCINI\Preliminary Results\Scripts\New Pipeline"
 
 #if the file already exists, append a new sheet. To have one file per animal with the different sessions in different sheets
 if os.path.isfile(f'{savedir}\{mouse}.xlsx'):
