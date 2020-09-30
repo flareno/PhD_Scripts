@@ -17,35 +17,38 @@ import numpy as np
 import os
 from openpyxl import load_workbook
 import glob
+import matplotlib.pyplot as plt
 
+group = 14
+mouse = 6409
+experiment = 'Fixed Delay'
+session = 'EF-P18'
+skiplast = False #True only for RANDOM DELAY!
 
-mouse = 173
-session = 'T8-1'
-
-og_path = fr"D:\F.LARENO.FACCINI\Preliminary Results\Behaviour\Group 15\{mouse}\Training\{session}\*.lick"
+og_path = fr"D:\F.LARENO.FACCINI\Preliminary Results\Behaviour\Group {group}\{mouse}\{experiment}\{session}\*.lick"
 files = glob.glob(og_path)
 #extract file name
 files = [os.path.basename(i) for i in files]
 
-basepath = fr"D:/F.LARENO.FACCINI/Preliminary Results/Behaviour/Group 15/{mouse}/Training/{session}"
-savedir = r"D:\F.LARENO.FACCINI\Preliminary Results\Behaviour\Database\Group 15"
+basepath = fr"D:/F.LARENO.FACCINI/Preliminary Results/Behaviour/Group {group}/{mouse}/{experiment}/{session}"
+savedir = r"D:\F.LARENO.FACCINI\Preliminary Results\Behaviour\Database"
 
 # During training mistakes in the recordings can happen.
 # These mistakes can lead to shorter recordings and thus to the creation of multiple files for the same session.
 # With the following loop I check if there are multiple files in the same session.
 # If so, I concatenate them so that the trial number becomes sequetial and I concatenate also the delays
 if len(files)>1:
-    licks = bv.concatenate_licks(basepath,skip_last=True)
+    licks = bv.concatenate_licks(basepath,skiplast) 
     files = [f.replace(".lick","") for f in files]
     trials = [0] # Initialize counter for trial number
     for idx,file in enumerate(files):
         #recreate path
         param = basepath+'/'+file+".param"
         #Load random delays
-        random = bv.extract_random_delay(param)
+        random = bv.extract_random_delay(param,skiplast,fixed_delay=500) 
         # Format the delay array
         delay = np.asarray([d for d, _ in (random)])
-        ot = np.asarray(bv.extract_ot(param))
+        ot = np.asarray(bv.extract_ot(param,skiplast)) 
         if idx ==0:
             delays = delay
             ots = ot
@@ -66,11 +69,11 @@ else:
     param = basepath+'/'+file+".param"
     # Load lick files and random delays
     licks = bv.load_lickfile(path)
-    random = bv.extract_random_delay(param)
+    random = bv.extract_random_delay(param,skiplast,fixed_delay=500) 
     # Format the lists
     delays = np.asarray([d for d, _ in (random)])
     trials = np.asarray([d for _,d in (random)])
-    ots = bv.extract_ot(param)
+    ots = bv.extract_ot(param,skiplast) 
 
 
 # ========================================================================================
@@ -114,8 +117,9 @@ for idx,x in enumerate(licks_by_trial):
 # Extracting the envelope of the PSTH (the n of the PSTH)
 # ========================================================================================
 n,bins,patches = bv.psth_lick(licks,samp_period=0.01)
-env_df = pd.DataFrame(n, index=None, columns=[f'Session {session}'])
-bins_df = pd.DataFrame(bins, index=None, columns=[f'Session {session}'])
+plt.close('all')
+env_df = pd.DataFrame(n, index=None, columns=[f'{session}'])
+bins_df = pd.DataFrame(bins, index=None, columns=[f'{session}'])
 
 
 # ========================================================================================
@@ -133,15 +137,15 @@ for idx,i in enumerate(all_licks.T):
 # ========================================================================================
 
 #if the file already exists, append a new sheet. To have one file per animal with the different sessions in different sheets
-if os.path.isfile(f'{savedir}\{mouse}.xlsx'):
-    book = load_workbook(f'{savedir}\{mouse}.xlsx')
-    exc = pd.read_excel(f'{savedir}\{mouse}.xlsx', sheet_name='Envelope')
-    exc[f'Session {session}'] = n
-    exc_bin = pd.read_excel(f'{savedir}\{mouse}.xlsx', sheet_name='Bins of Envelope')
-    exc_bin[f'Session {session}'] = bins
+if os.path.isfile(f'{savedir}\Group{group}_{mouse}.xlsx'):
+    book = load_workbook(f'{savedir}\Group{group}_{mouse}.xlsx') # THIS CODE IS NOT OPTIMIZED! I'M LOADING THE SAME FILE 3 TIMES I N A ROW (and mixing pandas and openpyxl)!!
+    exc = pd.read_excel(f'{savedir}\Group{group}_{mouse}.xlsx', sheet_name='Envelope') # FOR THE MOMENT IT WORKS AND IT'S STILL FAST. BUT ONCE I HAVE TIME I'LL FIX IT (we both know that it will never happen so I'm sorry, it will up to you, dear reader to do it)
+    exc[f'{session}'] = n
+    exc_bin = pd.read_excel(f'{savedir}\Group{group}_{mouse}.xlsx', sheet_name='Bins of Envelope')
+    exc_bin[f'{session}'] = bins
 
     
-    with pd.ExcelWriter(f'{savedir}\{mouse}.xlsx', engine="openpyxl") as writer:
+    with pd.ExcelWriter(f'{savedir}\Group{group}_{mouse}.xlsx', engine="openpyxl") as writer:
         writer.book = book
         writer.sheets = dict((ws.title, ws) for ws in book.worksheets)
         exc.to_excel(writer, index=False, sheet_name='Envelope')
@@ -152,7 +156,7 @@ if os.path.isfile(f'{savedir}\{mouse}.xlsx'):
         
 # creates new excel file if it doesn't exist for that mouse
 else:
-    with pd.ExcelWriter(f'{savedir}\{mouse}.xlsx', engine="openpyxl") as writer:    
+    with pd.ExcelWriter(f'{savedir}\Group{group}_{mouse}.xlsx', engine="openpyxl") as writer:    
         env_df.to_excel(writer,index=False, sheet_name='Envelope')
         bins_df.to_excel(writer, index=False, sheet_name = 'Bins of Envelope')
         df.to_excel(writer, index=False, sheet_name=f"Session {session}")
