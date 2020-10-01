@@ -31,7 +31,7 @@ files = glob.glob(og_path)
 files = [os.path.basename(i) for i in files]
 
 basepath = fr"D:/F.LARENO.FACCINI/Preliminary Results/Behaviour/Group {group}/{mouse}/{experiment}/{session}"
-savedir = r"D:\F.LARENO.FACCINI\Preliminary Results\Behaviour\Database"
+savedir = r"D:\F.LARENO.FACCINI\Preliminary Results\Behaviour\Database\Prova"
 
 # During training mistakes in the recordings can happen.
 # These mistakes can lead to shorter recordings and thus to the creation of multiple files for the same session.
@@ -60,6 +60,9 @@ if len(files)>1:
         trial[:] = [i+trials[-1] for i in trial]
         trials = np.append(trials,trial)
     trials = np.delete(trials,0)
+    new_random = [list(a) for a in zip(delays,trials)]
+    if 'Fixed Delay' not in experiment:
+        _, licks_by_delay = bv.separate_by_delay(new_random, licks)
 
 # In case there is only one file per session
 else:
@@ -69,7 +72,9 @@ else:
     param = basepath+'/'+file+".param"
     # Load lick files and random delays
     licks = bv.load_lickfile(path)
-    random = bv.extract_random_delay(param,skiplast,fixed_delay=500) 
+    random = bv.extract_random_delay(param,skiplast,fixed_delay=500)
+    if 'Fixed Delay' not in experiment:
+        _, licks_by_delay = bv.separate_by_delay(random, licks)
     # Format the lists
     delays = np.asarray([d for d, _ in (random)])
     trials = np.asarray([d for _,d in (random)])
@@ -121,11 +126,22 @@ plt.close('all')
 env_df = pd.DataFrame(n, index=None, columns=[f'{session}'])
 bins_df = pd.DataFrame(bins, index=None, columns=[f'{session}'])
 
+if 'Fixed Delay' not in experiment:
+    env_delay, bin_delay = {}, {}
+    for index,(key, values) in enumerate(licks_by_delay.items()):
+        if len(values) > 0:
+            n_delay,bins_delay,patches_delay = bv.psth_lick(values,samp_period=0.01)
+            plt.close('all')
+            env_delay[f'{key}'] = n_delay
+            bin_delay[f'{key}'] = bins_delay
+    
+    env_delay = pd.DataFrame(env_delay)
+    bin_delay = pd.DataFrame(bin_delay)
 
 # ========================================================================================
 # Create the dataframe
 # ========================================================================================
-cols = ['Trial Number', 'Delay (ms)', 'Opening Time (ms)', 'Number of Licks']#, 'Licks']
+cols = ['Trial Number', 'Delay (ms)', 'Opening Time (ms)', 'Number of Licks']
 df = pd.DataFrame(zip(trials, delays, ots, num_licks),columns=cols)
 
 # Add the lick times to the df column-wise (so that in the .xlsx each lick time will be stored in its individual cell)
@@ -139,24 +155,39 @@ for idx,i in enumerate(all_licks.T):
 #if the file already exists, append a new sheet. To have one file per animal with the different sessions in different sheets
 if os.path.isfile(f'{savedir}\Group{group}_{mouse}.xlsx'):
     book = load_workbook(f'{savedir}\Group{group}_{mouse}.xlsx') # THIS CODE IS NOT OPTIMIZED! I'M LOADING THE SAME FILE 3 TIMES I N A ROW (and mixing pandas and openpyxl)!!
-    exc = pd.read_excel(f'{savedir}\Group{group}_{mouse}.xlsx', sheet_name='Envelope') # FOR THE MOMENT IT WORKS AND IT'S STILL FAST. BUT ONCE I HAVE TIME I'LL FIX IT (we both know that it will never happen so I'm sorry, it will up to you, dear reader to do it)
+    exc = pd.read_excel(f'{savedir}\Group{group}_{mouse}.xlsx', sheet_name='Envelope TOT') # FOR THE MOMENT IT WORKS AND IT'S STILL FAST. BUT ONCE I HAVE TIME I'LL FIX IT (we both know that it will never happen so I'm sorry, it will up to you, dear reader to do it)
     exc[f'{session}'] = n
     exc_bin = pd.read_excel(f'{savedir}\Group{group}_{mouse}.xlsx', sheet_name='Bins of Envelope')
     exc_bin[f'{session}'] = bins
-
     
     with pd.ExcelWriter(f'{savedir}\Group{group}_{mouse}.xlsx', engine="openpyxl") as writer:
         writer.book = book
         writer.sheets = dict((ws.title, ws) for ws in book.worksheets)
-        exc.to_excel(writer, index=False, sheet_name='Envelope')
+        exc.to_excel(writer, index=False, sheet_name='Envelope TOT')
         exc_bin.to_excel(writer, index=False, sheet_name = 'Bins of Envelope')
+        if 'Fixed Delay' not in experiment:
+            for col in env_delay:
+                exc_del = pd.read_excel(f'{savedir}\Group{group}_{mouse}.xlsx', sheet_name=f'Envelope_{col}') # FOR THE MOMENT IT WORKS AND IT'S STILL FAST. BUT ONCE I HAVE TIME I'LL FIX IT (we both know that it will never happen so I'm sorry, it will up to you, dear reader to do it)
+                exc_del[f'{session}'] = env_delay[f'{col}']
+                exc_del.to_excel(writer,index=False, sheet_name=f'Envelope_{col}')
+            for col in bin_delay:
+                exc_bin_del = pd.read_excel(f'{savedir}\Group{group}_{mouse}.xlsx', sheet_name=f'Bins_{col}') # FOR THE MOMENT IT WORKS AND IT'S STILL FAST. BUT ONCE I HAVE TIME I'LL FIX IT (we both know that it will never happen so I'm sorry, it will up to you, dear reader to do it)
+                exc_bin_del[f'{session}'] = bin_delay[f'{col}']
+                exc_bin_del.to_excel(writer,index=False, sheet_name=f'Bins_{col}')
         df.to_excel(writer, index=False, sheet_name=f"Session {session}")
-
+        
         
         
 # creates new excel file if it doesn't exist for that mouse
 else:
     with pd.ExcelWriter(f'{savedir}\Group{group}_{mouse}.xlsx', engine="openpyxl") as writer:    
-        env_df.to_excel(writer,index=False, sheet_name='Envelope')
+        env_df.to_excel(writer,index=False, sheet_name='Envelope TOT')
         bins_df.to_excel(writer, index=False, sheet_name = 'Bins of Envelope')
+        if 'Fixed Delay' not in experiment:
+            for col in env_delay:
+                env__ = env_delay[f'{col}']
+                env__.rename(f'{session}').to_excel(writer,index=False, sheet_name=f'Envelope_{col}')
+            for col in bin_delay:
+                bin__ = bin_delay[f'{col}']
+                bin__.rename(f'{session}').to_excel(writer,index=False, sheet_name=f'Bins_{col}')
         df.to_excel(writer, index=False, sheet_name=f"Session {session}")
