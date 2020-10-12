@@ -7,6 +7,7 @@ Created on Wed Oct  7 15:33:21 2020
 
 import matplotlib.pyplot as plt
 import extrapy.Behaviour as bv
+import extrapy.Organize as organize
 import glob
 import os
 import numpy as np
@@ -15,13 +16,13 @@ import scipy.stats as stats
 from scipy.ndimage.filters import gaussian_filter1d
 
 savedir = "D:\F.LARENO.FACCINI\Preliminary Results\Behaviour\Figures"
-path = "D:\F.LARENO.FACCINI\Preliminary Results\Behaviour\Database\*.xlsx"
-files = glob.glob(path)
-#extract file name
-files = [os.path.basename(i) for i in files]
+path = "D:\F.LARENO.FACCINI\Preliminary Results\Behaviour\Database"
+files = organize.file_list(path, no_extension=False)
+# Get the list of mice ID
 mouse = [x.split("_")[-1] for x in files]
 mouse = [x.replace(".xlsx","") for x in mouse]
 ns = {}
+# Some parameters
 ot = 0.03
 d = 0.4
 len_reward = 0.15
@@ -88,7 +89,7 @@ for ind,i in enumerate(protocols):
     fig.legend()
     fig.suptitle(f'Median envelope all animals per protocol, delay: {delay}')
     # fig.suptitle(f'{topo}_Envelope per protocol')
-fig.savefig(savedir+f'/All_animals_NoStim vs Stim_{delay}.pdf')
+# fig.savefig(savedir+f'/All_animals_NoStim vs Stim_{delay}.pdf')
 # plt.close()
 
 
