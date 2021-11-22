@@ -4,6 +4,131 @@ Created on Wed Jun 23 15:43:43 2021
 
 @author: F.LARENO-FACCINI
 """
+def power_extraction_all_condition_together(mice,females):
+    delay_list = ('Fixed Delay','Random Delay')
+    # delay_list = ('Random Delay',)#'Random Delay')
+    sampling_rate = 20000
+    power_mean_dic = {}
+    for group, topi in mice.items():
+        for mouse in topi:
+            print(mouse)
+            protocols = {'P0': ['No Stim'],
+                          'P13': ['No Stim', 'Stim'],
+                          'P15': ['No Stim', 'Stim'],
+                          'P16': ['No Stim', 'Stim'],
+                          'P18': ['No Stim', 'Stim']}
+
+            gender = 'Female' if mouse in females else 'Male'
+
+            if int(group) < 15:
+                del protocols['P0']
+
+            for delay in delay_list:
+                if 'Fixed' in delay:
+                    skip_last = False
+                else:
+                    skip_last = True
+                
+                power = {}
+                for protocol, value in protocols.items():
+                    for cond in value:
+                        if f'{cond}' not in power_mean_dic.keys():
+                            power_mean_dic[f'{cond}'] = {}
+
+                        print(protocol, cond)
+
+                        basedir = fr'\\equipe2-nas2\F.LARENO-FACCINI\BACKUP FEDE\Ephy\Group {group}\{mouse} (CM16-Buz - {gender})\{delay}\{protocol}\{cond}'
+                        list_files = og.file_list(basedir, no_extension=False, ext='.rbf')
+
+                        lick_path = basedir.replace('Ephy', 'Behaviour').replace(f'\\{cond}', '')
+                        lick_path = lick_path+'\\' + og.file_list(lick_path, no_extension=False, ext='.lick')[0]
+                        licks, delays, ot = og.remove_empty_trials(lick_path,skip_last=skip_last,end_time='reward')#,return_delays=False)
+
+                        licks_dic = {delay: licks}
+
+                        
+
+                        for time, lick_data in licks_dic.items():
+                            good_trials = np.unique(lick_data[:, 0])
+
+                            if cond == 'No Stim' and 'P1' in protocol:
+                                good_trials = good_trials[good_trials < 31]
+                                delta = 1
+                                bad_trials = 30-len(good_trials)
+                            elif cond == 'Stim':
+                                good_trials = good_trials[good_trials > 30]
+                                delta = 31
+                                bad_trials = 30-len(good_trials)
+                            else:
+                                delta = 1
+                                bad_trials = 60-len(good_trials)
+                            print(time, 'Good Trials: ',len(good_trials),' Bad Trials: ', bad_trials)
+                           
+                            pox_values = len(good_trials)+bad_trials+delta
+                            bad = [x for x in range(delta,pox_values) if x not in good_trials]
+                            
+                            if state=='Good':
+                                selected_trials = good_trials
+                            else:
+                                selected_trials = bad
+                            
+                            print(selected_trials)
+    
+                            if len(selected_trials)>0:
+                                for indx, file in enumerate(list_files):
+                                    if indx+delta in selected_trials and 'McsRecording' in file:
+                                        path = basedir+'\\'+file
+                                        sigs = np.fromfile(path, dtype=float).reshape(-1, 16)
+                                        sigs = sigs[:179776,:]
+                                        # print(indx+delta)
+                                        temp__ = np.mean(sigs, axis=1)*1000 # to mV
+                                        complex_map, map_times, freqs, tfr_sampling_rate = scalogram.compute_timefreq(temp__, sampling_rate, f_start=4, f_stop=10, delta_freq=1, f0=0.6)
+                                        power_map = np.abs(complex_map)#**2
+                                        power_map = power_map/np.sum(power_map) # NORMALIZE
+                                        del(sigs, complex_map)
+                                        # print('Before', power_map.shape)
+                                        
+                                        # if time == 'Random Delay':
+                                            # current_delay = 2+delays[indx][0]/1000+ot
+                                            # # real_index_reward = int(current_delay*tfr_sampling_rate)
+                                            # # min_index_reward = int((2.4+ot)*tfr_sampling_rate)
+                                            # print(current_delay)
+                                            # to_cut = int(((2.9+ot)*tfr_sampling_rate)-((2.4+ot)*tfr_sampling_rate))
+                                            
+                                            # if current_delay > 2.6:
+                                            #     power_map = power_map[to_cut:,:]
+                                            # else:
+                                            #     power_map = power_map[:-to_cut,:]
+                                            # # print('After',power_map.shape)
+                                            
+                                        if f'{cond}_{time}' not in power.keys():
+                                            power[f'{cond}_{time}'] = power_map
+                                        else:
+                                            power[f'{cond}_{time}'] = np.dstack((
+                                                power[f'{cond}_{time}'], power_map))
+                                    
+                                print('shape power by mouse:', power[f'{cond}_{time}'].shape)
+    
+    
+                for cond in ['No Stim', 'Stim']:
+                    if f'{cond}_{delay}' in power.keys():
+                        if f'{delay}_{mouse}' not in power_mean_dic[f'{cond}'].keys():
+                            if len(power[f'{cond}_{delay}'].shape) == 3:
+                                power_mean_dic[f'{cond}'][f'{delay}_{mouse}'] = np.array(np.mean(power[f'{cond}_{delay}'],axis=2))
+                            else:
+                                power_mean_dic[f'{cond}'][f'{delay}_{mouse}'] = np.array(power[f'{cond}_{delay}'])
+                       
+                        else:
+                            if len(power[f'{cond}_{delay}'].shape) == 3:
+                                mean_mouse = np.mean(power[f'{cond}_{delay}'],axis=2)
+                            else:
+                                mean_mouse = power[f'{cond}_{delay}']
+                            power_mean_dic[f'{cond}'][f'{delay}_{mouse}'] = np.dstack((
+                                power_mean_dic[f'{cond}'][f'{delay}_{mouse}'], mean_mouse))
+        
+                        print(power_mean_dic[f'{cond}'][f'{delay}_{mouse}'].shape)
+   
+    return power_mean_dic,tfr_sampling_rate
 
 def power_extraction(mice,females):
     delay_list = ('Fixed Delay','Random Delay')
@@ -79,9 +204,10 @@ def power_extraction(mice,females):
                                     if indx+delta in selected_trials and 'McsRecording' in file:
                                         path = basedir+'\\'+file
                                         sigs = np.fromfile(path, dtype=float).reshape(-1, 16)
+                                        sigs = sigs[:179776,:]
                                         # print(indx+delta)
                                         temp__ = np.mean(sigs, axis=1)*1000 # to mV
-                                        complex_map, map_times, freqs, tfr_sampling_rate = scalogram.compute_timefreq(temp__, sampling_rate, f_start=1.5, f_stop=4, delta_freq=1, f0=1)
+                                        complex_map, map_times, freqs, tfr_sampling_rate = scalogram.compute_timefreq(temp__, sampling_rate, f_start=4, f_stop=10, delta_freq=1, f0=1)
                                         power_map = np.abs(complex_map)#**2
                                         power_map = power_map/np.sum(power_map) # NORMALIZE
                                         del(sigs, complex_map)
@@ -200,7 +326,7 @@ def plot_maker(power_mean_dic, state, band, tfr_sampling_rate, save=False):
                 
                 plt.title(f'{session.replace("No ","")}, {delay}, {band} {state} TRIALS')
                 if save:
-                    plt.savefig(savedir+fr'\Figures\{band}\{state} Trials\{delay}\{session.replace("No ","")}_{delay}_Ridge_{band}_{state}.pdf')
+                    plt.savefig(savedir+fr'\Figures\{band}\{state} Trials\{delay}\power_of_2_points\{session.replace("No ","")}_{delay}_Ridge_{band}_{state}.pdf')
            
 
 
@@ -277,10 +403,11 @@ def plot_sex(power_mean_dic,females, state, band, tfr_sampling_rate, save=False)
                 fig.legend()
                 fig.suptitle(f'{session.replace("No ","")}, {delay}, {band} {state} TRIALS')
                 if save:
-                    plt.savefig(savedir+fr'\Figures\{band}\{state} Trials\{delay}\Female vs Male\{session.replace("No ","")}_{delay}_Ridge_{band}_{state}.pdf')
+                    plt.savefig(savedir+fr'\Figures\{band}\{state} Trials\{delay}\Female vs Male\power_of_2_points\{session.replace("No ","")}_{delay}_Ridge_{band}_{state}.pdf')
                 
 
-
+import sys    
+sys.path.append(r'\\equipe2-nas2\Pierre.LE-CABEC\Code Pierre')
 import extrapy.Scalogram as scalogram
 import extrapy.Organize as og
 import extrapy.Behaviour as B
@@ -289,7 +416,7 @@ import matplotlib.pyplot as plt
 import scipy.stats as stats
 
 
-savedir = r'D:\F.LARENO.FACCINI\RESULTS\New Results\LFP\Ridge'
+savedir = r'\\equipe2-nas2\F.LARENO-FACCINI\BACKUP FEDE\RESULTS\LFP\Ridge'
 mice = {
     '14': (6401, 6402, 6409),
     '15': (173, 176),
@@ -300,15 +427,15 @@ females = (6409, 173, 176, 6456, 6457)
 state = 'Good'
 band = 'Delta'
 ####Power extraction####
-power_mean_dic,tfr_sampling_rate = power_extraction(mice,females)
+power_mean_dic,tfr_sampling_rate = power_extraction_all_condition_together(mice,females)
 
 
-og.pickle_saving(savedir+fr'\Dataframe\{band}_{state}_Trials__tfrSR_{tfr_sampling_rate}',power_mean_dic)
+og.pickle_saving(savedir+fr'\Dataframe\all condition together\{band}_{state}_Trials__tfrSR_{tfr_sampling_rate}',power_mean_dic)
 # power_mean_dic = og.pickle_loading(savedir+r'\Dataframe\Delta_Good_Trials__tfrSR_16.0')
 # tfr_sampling_rate = 16.0
 
-plot_maker(power_mean_dic, band=band, state=state, tfr_sampling_rate=tfr_sampling_rate, save=True) 
-plot_sex(power_mean_dic, females, band=band, state=state, tfr_sampling_rate=tfr_sampling_rate, save=True)
+# plot_maker(power_mean_dic, band=band, state=state, tfr_sampling_rate=tfr_sampling_rate, save=True) 
+# plot_sex(power_mean_dic, females, band=band, state=state, tfr_sampling_rate=tfr_sampling_rate, save=True)
 
 
                 
