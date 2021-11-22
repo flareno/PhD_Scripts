@@ -4,20 +4,124 @@ Created on Fri Jul 23 10:07:13 2021
 
 @author: F.LARENO-FACCINI
 """
-
-
-def compute_power(mice, females, state='Good', sampling_rate=20000):
+def compute_power_all_condition_together(mice, females, state='Good', sampling_rate=20000):
     delay_list = ('Fixed Delay','Random Delay')
+    
 
     power_mean_dic = {'Fixed Delay': {}, 'Random Delay':{}}
     for group, topi in mice.items():
         for mouse in topi:
             print(mouse)
             protocols = {'P0': ['No Stim'],
-                           'P13': ['No Stim', 'Stim'],
-                           'P15': ['No Stim', 'Stim'],
-                           'P16': ['No Stim', 'Stim'],
-                           'P18': ['No Stim', 'Stim']}
+                          'P13': ['No Stim', 'Stim'],
+                          'P15': ['No Stim', 'Stim'],
+                          'P16': ['No Stim', 'Stim'],
+                          'P18': ['No Stim', 'Stim']}
+            all_mice = (6401, 6402, 6409,173, 176,6924,6456, 6457)
+            gender = 'Female' if mouse in females else 'Male'
+    
+            if int(group) < 15:
+                del protocols['P0']
+    
+            for delay in delay_list:
+                if delay == 'Fixed':
+                    skip_last = False
+                else:
+                    skip_last = True
+                
+                power = {'No Stim':{}, 'Stim':{}}
+                for protocol, value in protocols.items():
+                    if protocol == 'P0':
+                        all_mice = (173, 176, 6924, 6456, 6457)
+
+                    for cond in value:
+                        if cond not in power_mean_dic[delay].keys():
+                            power_mean_dic[delay][cond] = dict.fromkeys(all_mice)
+    
+                        print(mouse,protocol, cond)
+                        basedir = fr'\\equipe2-nas2\F.LARENO-FACCINI\BACKUP FEDE\Ephy\Group {group}\{mouse} (CM16-Buz - {gender})\{delay}\{protocol}\{cond}'
+                        list_files = og.file_list(basedir, no_extension=False, ext='.rbf')
+    
+                        lick_path = basedir.replace('Ephy', 'Behaviour').replace(f'\\{cond}', '')
+                        lick_path = lick_path+'\\' + og.file_list(lick_path, no_extension=False, ext='.lick')[0]
+                        licks, delays, ot = og.remove_empty_trials(lick_path, skip_last=skip_last, end_time='reward')
+                        good_trials = np.unique(licks[:, 0])
+
+                        if cond == 'No Stim' and 'P1' in protocol:
+                            good_trials = good_trials[good_trials < 31]
+                            delta = 1
+                            bad_trials = 30-len(good_trials)
+                        elif cond == 'Stim':
+                            good_trials = good_trials[good_trials > 30]
+                            delta = 31
+                            bad_trials = 30-len(good_trials)
+                        else:
+                            delta = 1
+                            bad_trials = 60-len(good_trials)
+                        print(delay, 'Good Trials: ',len(good_trials),' Bad Trials: ', bad_trials)
+    
+                        # if cond == 'No Stim':
+                        pox_values = len(good_trials)+bad_trials+delta
+                        bad = [x for x in range(delta,pox_values) if x not in good_trials]
+                        
+                        
+                        if state=='Good':
+                            selected_trials = good_trials
+                        else:
+                            selected_trials = bad
+                        
+                        print(selected_trials)
+
+                        if len(selected_trials)>0:
+                        # if bad_trials>0:
+                            for indx, file in enumerate(list_files):
+                                if indx+delta in selected_trials and 'McsRecording' in file:
+                                    path = basedir+'\\'+file
+                                    sigs = np.fromfile(path, dtype=float).reshape(-1, 16)*1000 # to mV
+                                    sigs = sigs[:179776,:]
+
+                                    # print(indx+delta)
+                                    
+                                    for i in range(16):
+                                        complex_map, map_times, freqs, tfr_sampling_rate = scalogram.compute_timefreq(sigs[:,i], sampling_rate, f_start=30, f_stop=80, delta_freq=1, f0=3)
+                                        power_map = np.abs(complex_map)#**2
+                                        power_map = power_map/np.sum(power_map)
+                                        
+                                        if f'Ch_{i}' not in power[cond].keys():
+                                            power[cond][f'Ch_{i}'] = power_map
+                                        else:
+                                            power[cond][f'Ch_{i}'] = np.dstack((power[cond][f'Ch_{i}'],power_map))
+    
+                                    del(sigs, complex_map)
+                                    print('shape power by mouse:', power[cond]['Ch_15'].shape)
+                                
+                                # else:
+                                #     print(indx+delta, file)
+            
+                # delay loop lvl
+                for cond in ['No Stim', 'Stim']:
+                    for i in range(16):
+                        if power[cond][f'Ch_{i}'].ndim == 3:
+                            power[cond][f'Ch_{i}'] = scalogram.ridge(np.mean(power[cond][f'Ch_{i}'],axis=2))
+                        else:
+                            power[cond][f'Ch_{i}'] = scalogram.ridge(power[cond][f'Ch_{i}'])
+                    power_mean_dic[delay][cond][mouse] = power[cond]
+    
+    return power_mean_dic, tfr_sampling_rate
+
+def compute_power(mice, females, state='Good', sampling_rate=20000):
+    delay_list = ('Fixed Delay','Random Delay')
+    
+
+    power_mean_dic = {'Fixed Delay': {}, 'Random Delay':{}}
+    for group, topi in mice.items():
+        for mouse in topi:
+            print(mouse)
+            protocols = {'P0': ['No Stim'],
+                          'P13': ['No Stim', 'Stim'],
+                          'P15': ['No Stim', 'Stim'],
+                          'P16': ['No Stim', 'Stim'],
+                          'P18': ['No Stim', 'Stim']}
             all_mice = (6401, 6402, 6409,173, 176,6924,6456, 6457)
             gender = 'Female' if mouse in females else 'Male'
     
@@ -46,7 +150,7 @@ def compute_power(mice, females, state='Good', sampling_rate=20000):
                         lick_path = lick_path+'\\' + og.file_list(lick_path, no_extension=False, ext='.lick')[0]
                         licks, delays, ot = og.remove_empty_trials(lick_path,skip_last=False,end_time='reward')
                         good_trials = np.unique(licks[:, 0])
-    
+
                         power = {}
                         if cond == 'No Stim' and 'P1' in protocol:
                             good_trials = good_trials[good_trials < 31]
@@ -79,11 +183,12 @@ def compute_power(mice, females, state='Good', sampling_rate=20000):
                                 if indx+delta in selected_trials and 'McsRecording' in file:
                                     path = basedir+'\\'+file
                                     sigs = np.fromfile(path, dtype=float).reshape(-1, 16)*1000 # to mV
+                                    sigs = sigs[:179776,:]
 
                                     # print(indx+delta)
                                     
                                     for i in range(16):
-                                        complex_map, map_times, freqs, tfr_sampling_rate = scalogram.compute_timefreq(sigs[:,i], sampling_rate, f_start=10, f_stop=30, delta_freq=1, f0=1)
+                                        complex_map, map_times, freqs, tfr_sampling_rate = scalogram.compute_timefreq(sigs[:,i], sampling_rate, f_start=30, f_stop=80, delta_freq=1, f0=3)
                                         power_map = np.abs(complex_map)#**2
                                         power_map = power_map/np.sum(power_map)
                                         
@@ -136,7 +241,7 @@ def plot_single_mouse(power_mean_dic, band, state, save=False):
                         fig.suptitle(f'{session} {mouse} {band}')
                         plt.show()
                         if save:
-                            plt.savefig(fr'D:\F.LARENO.FACCINI\RESULTS\New Results\LFP\Ridge\Figures\{band}\{state} Trials\{delay}\Individual\By channel\{delay}_{session}_{mouse}_{band}.pdf')
+                            plt.savefig(fr'D:\F.LARENO.FACCINI\RESULTS\New Results\LFP\Ridge\Figures\{band}\{state} Trials\{delay}\Individual\By channel\power_of_2_points\{delay}_{session}_{mouse}_{band}.pdf')
                             plt.close()
 
                         
@@ -161,7 +266,7 @@ def plot_single_mouse(power_mean_dic, band, state, save=False):
                             plt.legend()
                             
                             if save:
-                                plt.savefig(fr'D:\F.LARENO.FACCINI\RESULTS\New Results\LFP\Ridge\Figures\{band}\{state} Trials\{delay}\Individual\Probe average\{delay}_{session}_{mouse}_{band}.pdf')
+                                plt.savefig(fr'D:\F.LARENO.FACCINI\RESULTS\New Results\LFP\Ridge\Figures\{band}\{state} Trials\{delay}\Individual\Probe average\power_of_2_points\{delay}_{session}_{mouse}_{band}.pdf')
                                 plt.close()
         
 def plot_all_mice(power_mean_dic, band, state, save=False):
@@ -211,10 +316,11 @@ def plot_all_mice(power_mean_dic, band, state, save=False):
                 plt.legend()
                 
                 if save:
-                    plt.savefig(fr'D:\F.LARENO.FACCINI\RESULTS\New Results\LFP\Ridge\Figures\{band}\{state} Trials\{delay}\All averaged\Probe average\{delay}_{session}_{band}.pdf')
+                    plt.savefig(fr'D:\F.LARENO.FACCINI\RESULTS\New Results\LFP\Ridge\Figures\{band}\{state} Trials\{delay}\All averaged\Probe average\power_of_2_points\{delay}_{session}_{band}.pdf')
                     plt.close()
 
-
+import sys    
+sys.path.append(r'\\equipe2-nas2\Pierre.LE-CABEC\Code Pierre')
 import extrapy.Scalogram as scalogram
 import extrapy.Organize as og
 import numpy as np
@@ -222,7 +328,7 @@ import matplotlib.pyplot as plt
 import scipy.stats as stats
 import pandas as pd
 
-savedir = r'D:\F.LARENO.FACCINI\RESULTS\New Results\LFP\Ridge'
+savedir = r'D:\F.LARENO.FACCINI\RESULTS\LFP\Ridge'
 
 mice = {
     '14': (6401, 6402, 6409),
@@ -232,15 +338,17 @@ mice = {
 
 females = (6409, 173, 176, 6456, 6457)
 state = 'Good'
-band = 'Beta'
+band = 'Gamma'
 
-power_mean_dic, tfr_sampling_rate = compute_power(mice, females, state=state)
+# power_mean_dic, tfr_sampling_rate = compute_power(mice, females, state=state)
+power_mean_dic_all_condition_together, tfr_sampling_rate = compute_power_all_condition_together(mice, females, state=state)
 
-og.pickle_saving(savedir+fr'\Dataframe\{band}_{state}_Trials__tfrSR_{tfr_sampling_rate}',power_mean_dic)
+
+og.pickle_saving(fr'\\equipe2-nas2\F.LARENO-FACCINI\BACKUP FEDE\RESULTS\LFP\Ridge\Dataframe\all condition together\{band}_{state}_Trials__tfrSR_{tfr_sampling_rate}',power_mean_dic_all_condition_together)
 
 # tfr_sampling_rate = 322.5806451612903
 # power_mean_dic = og.pickle_loading(savedir+fr'\Dataframe\power_of_2_points\{band}_{state}_Trials__tfrSR_{tfr_sampling_rate}')
 
-plot_single_mouse(power_mean_dic, band=band, state=state, save=True)
+# plot_single_mouse(power_mean_dic, band=band, state=state, save=True)
 
-plot_all_mice(power_mean_dic, band=band, state=state, save=True)
+# plot_all_mice(power_mean_dic, band=band, state=state, save=True)
